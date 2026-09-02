@@ -1,0 +1,9 @@
+# RoadTwin AI — YOLO Dataset Config
+path: "c:/Users/yuvra/Coding Projects/RoadTwinAI/data"
+train: images
+val: images
+
+names:
+  0: pothole
+  1: crack
+  2: manhole
