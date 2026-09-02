@@ -21,8 +21,33 @@
   body{
     background:var(--bg); color:var(--text);
     font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
-    height:100vh; overflow:hidden;
+    height:auto; min-height:100vh; overflow-x:hidden;
   }
+  .app{ /* hero stays exactly one viewport tall, rest of the page scrolls below it */ }
+  .page-section{max-width:1100px; margin:0 auto; padding:90px 24px;}
+  .page-section h3{font-size:11px; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin-bottom:10px; font-family:'IBM Plex Mono',monospace;}
+  .page-section h2.big{font-size:32px; font-weight:600; margin-bottom:18px; max-width:760px; line-height:1.25;}
+  .page-section p.lead{color:var(--muted); font-size:14.5px; max-width:640px; line-height:1.7; margin-bottom:36px;}
+  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:900px){.grid4{grid-template-columns:1fr 1fr;} .grid2{grid-template-columns:1fr;}}
+  .road-card{background:var(--panel2); border:1px solid var(--border); border-radius:2px; padding:16px; opacity:0; transform:translateY(16px);}
+  .road-card .rc-id{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; margin-bottom:10px;}
+  .road-card .rc-row{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px;}
+  .road-card .rc-row b{color:var(--text); font-family:'IBM Plex Mono',monospace;}
+  .step-card{background:var(--panel2); border:1px solid var(--border); border-left:2px solid var(--accent); padding:18px 20px; opacity:0; transform:translateY(16px);}
+  .step-card .sc-n{font-family:'IBM Plex Mono',monospace; color:var(--accent); font-size:11px; margin-bottom:8px;}
+  .step-card h4{font-size:14.5px; font-weight:600; margin-bottom:6px;}
+  .step-card p{font-size:12.5px; color:var(--muted); line-height:1.6;}
+  .reveal-in{opacity:1 !important; transform:none !important; transition:opacity .6s ease, transform .6s ease;}
+  .team-card{background:var(--panel2); border:1px solid var(--border); padding:16px; text-align:center;}
+  .team-card .tc-name{font-size:13px; font-weight:600;}
+  .team-card .tc-role{font-size:10.5px; color:var(--accent); font-family:'IBM Plex Mono',monospace; margin-top:4px;}
+  .team-card .tc-id{font-size:10px; color:var(--muted); margin-top:4px; font-family:'IBM Plex Mono',monospace;}
+  .sim-panel{background:var(--panel2); border:1px solid var(--border); padding:22px; font-family:'IBM Plex Mono',monospace;}
+  .sim-panel .sim-bar{display:flex; align-items:center; gap:10px; margin:8px 0; font-size:12px;}
+  .sim-panel .sim-bar .sim-fill{height:8px; background:var(--red); border-radius:2px;}
+  footer.page-section{text-align:center; color:var(--muted); font-size:11px; border-top:1px solid var(--border); padding-top:40px;}
   .mono{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;}
   .app{display:grid; grid-template-columns:1fr 420px; grid-template-rows:52px 1fr; height:100vh;}
   header{
@@ -178,6 +203,65 @@
   </div>
 </div>
 
+<section class="page-section" id="networkSection">
+  <h3>// Network Overview</h3>
+  <h2 class="big">Every segment, watched the same way.</h2>
+  <p class="lead">Each road on the network carries the same live pipeline shown above — its own condition score, deterioration forecast, and repair priority, recomputed the moment new footage streams in.</p>
+  <div class="grid4" id="roadGrid">
+    <div class="road-card"><div class="rc-id">Loading…</div></div>
+  </div>
+</section>
+
+<section class="page-section" id="problemSection">
+  <h3>// The Problem</h3>
+  <h2 class="big">Road maintenance today is reactive, not predictive.</h2>
+  <div class="grid2">
+    <div class="step-card"><div class="sc-n">01</div><h4>Road gets damaged</h4><p>A pothole, crack, or waterlogged stretch forms — invisible to anyone until it's driven over.</p></div>
+    <div class="step-card"><div class="sc-n">02</div><h4>Someone notices it</h4><p>Damage has to get bad enough, or dangerous enough, before a driver or pedestrian flags it.</p></div>
+    <div class="step-card"><div class="sc-n">03</div><h4>Complaint or inspection</h4><p>The report has to reach the right department and get logged before anything moves.</p></div>
+    <div class="step-card"><div class="sc-n">04</div><h4>Inspection team dispatched</h4><p>Someone has to physically visit the site to confirm the damage before repair is approved.</p></div>
+  </div>
+  <p class="lead" style="margin-top:24px;">Authorities know <i>where</i> a pothole is. They don't know which defects are worsening fastest, which roads should be repaired first, or what happens to traffic if a road is closed for repair.</p>
+</section>
+
+<section class="page-section" id="pipelineSection">
+  <h3>// How The Twin Thinks</h3>
+  <h2 class="big">Five small, focused agents beat one giant model.</h2>
+  <div class="grid2">
+    <div class="step-card"><div class="sc-n">VA · Vision Agent</div><h4>Detection</h4><p>A YOLO-family detector reads dashcam frames and finds potholes, cracks, waterlogging, damaged barriers, faded markings, and broken streetlights.</p></div>
+    <div class="step-card"><div class="sc-n">SF · Sensor Fusion</div><h4>Localization</h4><p>GPS and accelerometer (IMU) readings are fused with each detection to pin it to the exact stretch of road.</p></div>
+    <div class="step-card"><div class="sc-n">CM · Condition Model</div><h4>Scoring</h4><p>Detections are converted into a single 0–100 condition score, rule-weighted by defect type and severity.</p></div>
+    <div class="step-card"><div class="sc-n">DF · Deterioration Forecast</div><h4>Prediction</h4><p>A trend model learns from condition history and forecasts the score forward at +7, +30, and +60 days.</p></div>
+  </div>
+  <div class="step-card" style="margin-top:14px;"><div class="sc-n">DE · Decision Engine</div><h4>Prioritization &amp; alerting</h4><p>Condition, forecast, and traffic-risk context combine into a repair-priority rank across the whole network — then the responsible authority is alerted automatically, with a recommended repair window.</p></div>
+</section>
+
+<section class="page-section" id="simSection">
+  <h3>// Differentiator</h3>
+  <h2 class="big">Damage isn't risk. Context is.</h2>
+  <p class="lead">Road Risk = Damage × Exposure × Context — the same pothole scores very differently on a school-adjacent arterial road versus a quiet residential street.</p>
+  <div class="sim-panel">
+    <div style="color:var(--muted); margin-bottom:14px;">WHAT-IF: "Close R-1042 for repair?"</div>
+    <div class="sim-bar"><span style="width:70px;">Road B</span><div class="sim-fill" style="width:170px;"></div><span>+34% congestion</span></div>
+    <div class="sim-bar"><span style="width:70px;">Road C</span><div class="sim-fill" style="width:105px; background:var(--orange);"></div><span>+21% congestion</span></div>
+    <div class="sim-bar"><span style="width:70px;">Road D</span><div class="sim-fill" style="width:40px; background:var(--green);"></div><span>+8% congestion</span></div>
+    <div style="margin-top:16px; color:var(--accent);">Recommendation: repair 23:00–05:00 · divert via Route C</div>
+  </div>
+</section>
+
+<section class="page-section" id="teamSection">
+  <h3>// Team Snipe Coders</h3>
+  <h2 class="big">Built end-to-end across vision, ML, backend, and product.</h2>
+  <div class="grid4">
+    <div class="team-card"><div class="tc-name">Yuvraj Singh Thakur</div><div class="tc-role">Vision & Detection</div><div class="tc-id">RA2411047010137</div></div>
+    <div class="team-card"><div class="tc-name">Laksh Nagori</div><div class="tc-role">Sensor Fusion & ML</div><div class="tc-id">RA2411047010139</div></div>
+    <div class="team-card"><div class="tc-name">Mohd. Taha Ali</div><div class="tc-role">Backend & Decision Engine</div><div class="tc-id">RA2411047010153</div></div>
+    <div class="team-card"><div class="tc-name">Harshvardhan Aggrawal</div><div class="tc-role">Frontend & Digital Twin</div><div class="tc-id">RA2411047010165</div></div>
+  </div>
+</section>
+
+<footer class="page-section">RoadTwin AI — Observe · Predict · Prioritize · Repair · Repeat.</footer>
+
 <script>
 // ---- Backend config ----
 const API_BASE = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : 'http://127.0.0.1:8001';
@@ -298,6 +382,7 @@ async function bootstrap(){
     }));
     allRoads.forEach(renderRoad);
     rebuildHeat();
+    populateNetworkGrid();
 
     focusRoad = allRoads.find(r => r.name === FOCUS_ROAD_NAME);
     if(!focusRoad) throw new Error(`${FOCUS_ROAD_NAME} not found after seeding`);
@@ -505,6 +590,30 @@ btn.addEventListener('click', async ()=>{
 });
 
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+function populateNetworkGrid(){
+  const grid = document.getElementById('roadGrid');
+  grid.innerHTML = '';
+  allRoads.forEach(r=>{
+    const score = r.score ?? 100;
+    const cls = score < 70 ? 'high' : 'low';
+    const card = document.createElement('div');
+    card.className = 'road-card';
+    card.innerHTML = `
+      <div class="rc-id">${r.name}</div>
+      <div class="rc-row"><span>Condition</span><b class="${cls === 'high' ? 'score-val high' : 'score-val low'}">${score}</b></div>
+      <div class="rc-row"><span>Priority</span><b>#${r.priority_rank ?? '—'}</b></div>
+      <div class="rc-row"><span>Risk</span><b>${cls === 'high' ? 'HIGH' : 'LOW'}</b></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// scroll-reveal for the content sections below the hero
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('reveal-in'); });
+}, {threshold:0.15});
+document.querySelectorAll('.road-card, .step-card, .team-card').forEach(el=>revealObserver.observe(el));
 </script>
 </body>
 </html>
