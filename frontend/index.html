@@ -24,6 +24,7 @@
     height:auto; min-height:100vh; overflow-x:hidden;
   }
   html{scroll-behavior:smooth;}
+  section[id]{scroll-margin-top:52px;}
   .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.5px; padding:14px 12px; white-space:nowrap; border-bottom:2px solid transparent;}
   .nav-link:hover{color:var(--text);}
   .nav-link.active{color:var(--accent); border-bottom-color:var(--accent);}
@@ -218,7 +219,7 @@
 </nav>
 
 <section class="page-section" id="networkSection">
-  <h3>// Network Overview</h3>
+  <h3>Network Overview</h3>
   <h2 class="big">Every segment, watched the same way.</h2>
   <p class="lead">Each road on the network carries the same live pipeline shown above — its own condition score, deterioration forecast, and repair priority, recomputed the moment new footage streams in.</p>
   <div class="grid4" id="roadGrid">
@@ -227,7 +228,7 @@
 </section>
 
 <section class="page-section" id="problemSection">
-  <h3>// The Problem</h3>
+  <h3>The Problem</h3>
   <h2 class="big">Road maintenance today is reactive, not predictive.</h2>
   <div class="grid2">
     <div class="step-card"><div class="sc-n">01</div><h4>Road gets damaged</h4><p>A pothole, crack, or waterlogged stretch forms — invisible to anyone until it's driven over.</p></div>
@@ -239,7 +240,7 @@
 </section>
 
 <section class="page-section" id="pipelineSection">
-  <h3>// How The Twin Thinks</h3>
+  <h3>How The Twin Thinks</h3>
   <h2 class="big">Five small, focused agents beat one giant model.</h2>
   <div class="grid2">
     <div class="step-card"><div class="sc-n">VA · Vision Agent</div><h4>Detection</h4><p>A YOLO-family detector reads dashcam frames and finds potholes, cracks, waterlogging, damaged barriers, faded markings, and broken streetlights.</p></div>
@@ -251,7 +252,7 @@
 </section>
 
 <section class="page-section" id="simSection">
-  <h3>// Differentiator</h3>
+  <h3>Differentiator</h3>
   <h2 class="big">Damage isn't risk. Context is.</h2>
   <p class="lead">Road Risk = Damage × Exposure × Context — the same pothole scores very differently on a school-adjacent arterial road versus a quiet residential street.</p>
   <div class="sim-panel">
@@ -264,7 +265,7 @@
 </section>
 
 <section class="page-section" id="teamSection">
-  <h3>// Team Snipe Coders</h3>
+  <h3>Team Snipe Coders</h3>
   <h2 class="big">Built end-to-end across vision, ML, backend, and product.</h2>
   <div class="grid4">
     <div class="team-card"><div class="tc-name">Yuvraj Singh Thakur</div><div class="tc-role">Vision & Detection</div><div class="tc-id">RA2411047010137</div></div>
@@ -275,7 +276,7 @@
 </section>
 
 <section class="page-section" id="prioritySection">
-  <h3>// Live Decision Engine</h3>
+  <h3>Live Decision Engine</h3>
   <h2 class="big">Recompute repair priority across the whole network.</h2>
   <p class="lead">Calls the real <span class="mono">/repair-priorities</span> endpoint — condition score × traffic risk, ranked live, right now.</p>
   <button class="btn" id="rankBtn" style="max-width:260px; margin-bottom:20px;">Run Priority Ranking →</button>
@@ -283,7 +284,7 @@
 </section>
 
 <section class="page-section" id="reportSection">
-  <h3>// Report A Defect</h3>
+  <h3>Report A Defect</h3>
   <h2 class="big">Feed the twin yourself.</h2>
   <p class="lead">Posts a real defect to <span class="mono">/defects</span> — the condition score, forecast, and priority rank for that road update live from your input.</p>
   <div class="sim-panel" style="max-width:560px;">
