@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RoadTwin AI — Live Digital Twin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#101317; --panel2:#14171c; --border:#252a31;
+    --text:#dde2e8; --muted:#767f8c; --accent:#4a9eff; --green:#3fb950;
+    --orange:#c9942f; --red:#d64545;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    height:100vh; overflow:hidden;
+  }
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;}
+  .app{display:grid; grid-template-columns:1fr 420px; grid-template-rows:52px 1fr; height:100vh;}
+  header{
+    grid-column:1/3; display:flex; align-items:center; justify-content:space-between;
+    padding:0 20px; border-bottom:1px solid var(--border); background:var(--panel);
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .mark{width:22px; height:22px; flex-shrink:0;}
+  .brand h1{font-size:14px; font-weight:600; letter-spacing:.2px;}
+  .brand .sep{color:var(--border); margin:0 10px;}
+  .brand .sub{color:var(--muted); font-size:11px; font-weight:400;}
+  .status{display:flex; align-items:center; gap:7px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--muted); letter-spacing:.5px; text-transform:uppercase;}
+  .status .sq{width:6px; height:6px; background:var(--green);}
+  .tagline{color:var(--muted); font-size:11.5px; font-family:'IBM Plex Mono',monospace;}
+  #map{width:100%; height:100%;}
+  .sidebar{
+    background:var(--panel); border-left:1px solid var(--border);
+    padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+    perspective:1200px;
+  }
+  .card{
+    background:var(--panel2); border:1px solid var(--border); border-radius:2px; padding:14px;
+    transform-style:preserve-3d; transition:transform .12s ease-out, box-shadow .12s ease-out;
+    will-change:transform; box-shadow:0 1px 0 rgba(0,0,0,.3);
+  }
+  .card:hover{box-shadow:0 22px 40px -12px rgba(0,0,0,.55);}
+  .stat-box, .badge, .priority-val, .value{ transform-style:preserve-3d; backface-visibility:hidden; }
+  .card h2{font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; font-weight:600; padding-bottom:8px; border-bottom:1px solid var(--border);}
+  .road-id{font-size:16px; font-weight:600; margin-bottom:2px; font-family:'IBM Plex Mono',monospace;}
+  .road-loc{font-size:11px; color:var(--muted); margin-bottom:12px;}
+  .stat-row{display:flex; gap:1px; margin-bottom:1px; background:var(--border);}
+  .stat-box{flex:1; background:var(--panel2); padding:9px 10px; text-align:center; position:relative; overflow:hidden;}
+  .stat-box .label{font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px;}
+  .stat-box .value{font-size:22px; font-weight:600; margin-top:4px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Mono',monospace;}
+  .badge{display:inline-block; padding:2px 8px; border-radius:2px; font-size:10px; font-weight:600; letter-spacing:.4px; font-family:'IBM Plex Mono',monospace; border:1px solid currentColor;}
+  .badge.low{color:var(--green);}
+  .badge.high{color:var(--red);}
+  .priority-val{color:var(--green);}
+  .priority-val.high{color:var(--red);}
+  .score-val.high{color:var(--red);}
+  .score-val.low{color:var(--green);}
+  .forecast{display:flex; gap:1px; margin-top:10px; opacity:0; background:var(--border);}
+  .forecast .stat-box{background:var(--panel2); border-top:2px solid var(--red);}
+  .detections{list-style:none; margin-top:10px; display:flex; flex-direction:column; gap:5px;}
+  .detections li{font-size:12px; padding:7px 9px; background:var(--bg); border-left:2px solid var(--orange); opacity:0; transform:translateX(-8px); display:flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace;}
+  .detections li b{color:var(--orange); font-weight:600;}
+  .btn{
+    width:100%; padding:11px; border:1px solid var(--accent); border-radius:2px; background:transparent; color:var(--accent);
+    font-size:11.5px; font-weight:600; cursor:pointer; letter-spacing:.6px; margin-top:14px;
+    transition:background .15s, color .15s; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;
+  }
+  .btn:hover{background:var(--accent); color:#0b0d10;}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+  .pipeline{display:flex; align-items:center; justify-content:space-between; margin-top:2px;}
+  .stage{flex:1; text-align:center; position:relative;}
+  .stage .icon{
+    width:30px; height:30px; border-radius:2px; background:var(--bg); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:10px;
+    transition:background .3s, border-color .3s, color .3s; font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--muted);
+    transform-style:preserve-3d; backface-visibility:hidden;
+  }
+  .stage .label{font-size:8.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
+  .stage.active .icon{background:var(--accent); border-color:var(--accent); color:#0b0d10;}
+  .stage.active .label{color:var(--accent); font-weight:600;}
+  .stage.done .icon{border-color:var(--green); color:var(--green);}
+  .connector{position:absolute; top:15px; left:calc(50% + 22px); width:calc(100% - 28px); height:1px; background:var(--border); z-index:-1;}
+  .connector.on{background:var(--green);}
+  .toast{
+    position:fixed; top:64px; right:436px; background:var(--panel2); border:1px solid var(--border); border-left:3px solid var(--red);
+    border-radius:2px; padding:12px 16px; display:flex; align-items:center; gap:10px; z-index:999;
+    box-shadow:0 20px 45px -10px rgba(0,0,0,.6); opacity:0; transform:perspective(600px) rotateX(-90deg);
+    transform-origin:top center; max-width:330px;
+  }
+  .toast .ic{width:14px; height:14px; flex-shrink:0; margin-top:2px;}
+  .toast .msg strong{display:block; font-size:11.5px; font-weight:600;}
+  .toast .msg span{font-size:10.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
+  .legend{position:absolute; bottom:14px; left:14px; background:rgba(16,19,23,.92); border:1px solid var(--border); border-radius:2px; padding:8px 12px; font-size:10.5px; z-index:500; display:flex; gap:12px; font-family:'IBM Plex Mono',monospace; color:var(--muted);}
+  .legend div{display:flex; align-items:center; gap:6px;}
+  .legend .sw{width:10px; height:3px;}
+  .coord-readout{position:absolute; top:14px; left:14px; background:rgba(16,19,23,.92); border:1px solid var(--border); border-radius:2px; padding:6px 10px; font-size:10px; z-index:500; font-family:'IBM Plex Mono',monospace; color:var(--muted); letter-spacing:.3px;}
+  .leaflet-container{background:#0b0d10 !important;}
+  .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.7);}
+
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr; grid-template-rows:52px 55vh 1fr; height:auto; min-height:100vh;}
+    header{grid-column:1;}
+    #map{grid-column:1; grid-row:2;}
+    .sidebar{grid-column:1; grid-row:3; border-left:none; border-top:1px solid var(--border);}
+    body{overflow-y:auto; height:auto; min-height:100vh;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg class="mark" id="logoMark" viewBox="0 0 24 24" fill="none" style="perspective:400px;">
+        <polygon points="12,2 21,7 21,17 12,22 3,17 3,7" stroke="#4a9eff" stroke-width="1.4"/>
+        <path d="M6 15 L11 9 L14 12 L18 7" stroke="#3fb950" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>ROADTWIN</h1>
+      <span class="sep">/</span>
+      <span class="sub">Observe · Predict · Prioritize · Repair · Repeat</span>
+    </div>
+    <div class="status"><span class="sq" id="statusSq"></span><span id="statusTxt">SYNCED — SECTOR 04</span></div>
+  </header>
+  <div id="map"></div>
+  <div class="sidebar">
+    <div class="card">
+      <h2>Focused Segment <span id="tick" class="badge low">LIVE</span></h2>
+      <div class="road-id">Road R-1042</div>
+      <div class="road-loc">GST Road, Kattankulathur — last scanned 2 min ago</div>
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="label">Condition Score</div>
+          <div class="value score-val low" id="score">82</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Risk</div>
+          <div class="value" style="font-size:16px; margin-top:8px;"><span class="badge low" id="riskBadge">LOW</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Priority</div>
+          <div class="value priority-val" id="priority">#7</div>
+        </div>
+      </div>
+      <ul class="detections" id="detections">
+        <li>+3 NEW <b>POTHOLES</b></li>
+        <li>+4 NEW <b>CRACKS</b></li>
+        <li><b>WATERLOGGING</b> PRESENT</li>
+      </ul>
+      <div class="forecast" id="forecast">
+        <div class="stat-box"><div class="label">+30 Day Forecast</div><div class="value" id="f30" style="font-size:20px;">47</div></div>
+        <div class="stat-box"><div class="label">+60 Day Forecast</div><div class="value" id="f60" style="font-size:20px;">31</div></div>
+      </div>
+      <button class="btn" id="simBtn">Stream New Dashcam Footage →</button>
+    </div>
+
+    <div class="card">
+      <h2>Intelligence Pipeline</h2>
+      <div class="pipeline">
+        <div class="stage" data-stage="0"><div class="connector"></div><div class="icon">VA</div><div class="label">Vision</div></div>
+        <div class="stage" data-stage="1"><div class="connector"></div><div class="icon">SF</div><div class="label">Fusion</div></div>
+        <div class="stage" data-stage="2"><div class="connector"></div><div class="icon">CM</div><div class="label">Condition</div></div>
+        <div class="stage" data-stage="3"><div class="connector"></div><div class="icon">DF</div><div class="label">Forecast</div></div>
+        <div class="stage" data-stage="4"><div class="icon">DE</div><div class="label">Decision</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Network Snapshot</h2>
+      <div style="font-size:12.5px; color:var(--muted); line-height:1.7;">
+        4 segments monitored · 1 critical · updated in real time as new footage streams in from dashcams across the network.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Map setup ----
+const map = L.map('map', {zoomControl:true, attributionControl:false}).setView([12.8232, 80.0445], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+
+const legend = L.control({position:'bottomleft'});
+document.querySelector('#map').insertAdjacentHTML('beforeend', `
+  <div class="legend">
+    <div><span class="sw" style="background:#22c55e"></span>Low risk</div>
+    <div><span class="sw" style="background:#f59e0b"></span>Medium</div>
+    <div><span class="sw" style="background:#ef4444"></span>High risk</div>
+  </div>`);
+
+const roads = [
+  {id:'R-1015', coords:[[12.8280,80.0400],[12.8265,80.0430]], color:'#3fb950', risk:0.25},
+  {id:'R-1033', coords:[[12.8210,80.0470],[12.8190,80.0500]], color:'#c9942f', risk:0.55},
+  {id:'R-1050', coords:[[12.8195,80.0390],[12.8175,80.0420]], color:'#3fb950', risk:0.22},
+];
+roads.forEach(r=>{
+  L.polyline(r.coords, {color:r.color, weight:5, opacity:.85}).bindPopup(`<b>${r.id}</b><br>Stable`).addTo(map);
+});
+
+const mainCoords = [[12.8245,80.0430],[12.8230,80.0450],[12.8215,80.0460]];
+const mainLine = L.polyline(mainCoords, {color:'#3fb950', weight:7, opacity:.95}).addTo(map);
+mainLine.bindPopup('<b>R-1042</b><br>Condition: 82 · Priority #7');
+
+const marker = L.circleMarker([12.8230,80.0450], {radius:9, color:'#3fb950', weight:2, fillColor:'#3fb950', fillOpacity:.5}).addTo(map);
+
+// ---- Risk heatmap: sample points along every segment, weighted by risk ----
+function lerp(a,b,t){ return a+(b-a)*t; }
+function samplePoints(coords, weight, steps){
+  const pts=[];
+  for(let i=0;i<coords.length-1;i++){
+    for(let s=0;s<=steps;s++){
+      const t=s/steps;
+      pts.push([lerp(coords[i][0],coords[i+1][0],t), lerp(coords[i][1],coords[i+1][1],t), weight]);
+    }
+  }
+  return pts;
+}
+let heatPoints = [];
+roads.forEach(r=> heatPoints = heatPoints.concat(samplePoints(r.coords, r.risk, 6)));
+let mainHeat = samplePoints(mainCoords, 0.2, 6);
+heatPoints = heatPoints.concat(mainHeat);
+
+const heatLayer = L.heatLayer(heatPoints, {
+  radius:32, blur:28, maxZoom:17, max:1.0,
+  gradient:{0.15:'#3fb950', 0.45:'#c9942f', 0.75:'#d64545'}
+}).addTo(map);
+
+// ---- Demo state machine ----
+const btn = document.getElementById('simBtn');
+const stages = document.querySelectorAll('.stage');
+let ran = false;
+
+function setStage(i, cls){
+  stages.forEach(s=>s.classList.remove('active'));
+  if(i>=0){
+    stages[i].classList.add('active');
+    anime({targets:stages[i].querySelector('.icon'), rotateY:[0,360], duration:500, easing:'easeOutQuad'});
+  }
+  for(let j=0;j<i;j++){ stages[j].classList.remove('active'); stages[j].classList.add('done'); }
+  stages.forEach(s=>{ const c=s.querySelector('.connector'); if(c) c.classList.toggle('on', s.classList.contains('done')); });
+}
+
+function countTo(el, from, to, dur){
+  const obj = {v:from};
+  anime({targets:obj, v:to, duration:dur, easing:'easeInOutQuad',
+    update:()=>{ el.textContent = Math.round(obj.v); }});
+}
+
+// flip-clock style 3D value swap
+function flipValue(el, newText, onMid){
+  return anime({targets:el, rotateX:[0,-90], duration:220, easing:'easeInQuad',
+    complete:()=>{
+      if(onMid) onMid(); else el.textContent = newText;
+      anime({targets:el, rotateX:[90,0], duration:260, easing:'easeOutBack'});
+    }});
+}
+
+function showToast(){
+  const t = document.createElement('div');
+  t.className='toast';
+  t.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="#d64545" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="#d64545" stroke-width="1.6"/><circle cx="12" cy="17" r="1" fill="#d64545"/></svg><div class="msg"><strong>Authorities alerted automatically</strong><span>R-1042 escalated to Priority #1 — repair window 23:00–05:00</span></div>`;
+  document.body.appendChild(t);
+  anime({targets:t, opacity:[0,1], rotateX:[-90,0], duration:550, easing:'easeOutBack'});
+  setTimeout(()=>{
+    anime({targets:t, opacity:0, rotateX:-90, duration:350, easing:'easeInQuad', complete:()=>t.remove()});
+  }, 5200);
+}
+
+// mouse-reactive 3D tilt on cards
+document.querySelectorAll('.card').forEach(card=>{
+  card.addEventListener('mousemove', e=>{
+    const r = card.getBoundingClientRect();
+    const nx = (e.clientX - r.left)/r.width - .5;
+    const ny = (e.clientY - r.top)/r.height - .5;
+    card.style.transform = `rotateY(${nx*7}deg) rotateX(${-ny*7}deg) translateZ(6px)`;
+  });
+  card.addEventListener('mouseleave', ()=>{ card.style.transform = 'rotateY(0) rotateX(0) translateZ(0)'; });
+});
+
+// logo entrance spin
+anime({targets:'#logoMark', rotateY:[270,360], duration:1100, easing:'easeOutCubic'});
+setInterval(()=>{
+  anime({targets:'#statusSq', opacity:[1,.25,1], duration:1400, easing:'easeInOutSine'});
+}, 1400);
+
+btn.addEventListener('click', async ()=>{
+  if(ran) return;
+  ran = true;
+  btn.disabled = true;
+  btn.textContent = 'Processing footage…';
+
+  const lis = document.querySelectorAll('#detections li');
+
+  // Stage 0: Vision
+  setStage(0);
+  await sleep(600);
+  for(const li of lis){
+    anime({targets:li, opacity:[0,1], translateX:[-10,0], duration:400, easing:'easeOutQuad'});
+    await sleep(250);
+  }
+  await sleep(400);
+
+  // Stage 1: Sensor fusion
+  setStage(1);
+  marker.setStyle({color:'#c9942f', fillColor:'#c9942f'});
+  anime({targets:{r:9}, r:16, duration:500, update:function(a){ marker.setRadius(a.animations[0].currentValue); }});
+  await sleep(700);
+
+  // Stage 2: Condition model — score flips, risk flips
+  setStage(2);
+  const scoreEl = document.getElementById('score');
+  flipValue(scoreEl, null, ()=>{
+    countTo(scoreEl, 82, 64, 700);
+    scoreEl.classList.remove('low'); scoreEl.classList.add('high');
+  });
+  const riskBadge = document.getElementById('riskBadge');
+  await sleep(950);
+  flipValue(riskBadge, 'HIGH', ()=>{
+    riskBadge.textContent = 'HIGH'; riskBadge.classList.remove('low'); riskBadge.classList.add('high');
+  });
+  const priority = document.getElementById('priority');
+  flipValue(priority, '#1', ()=>{
+    priority.textContent = '#1'; priority.classList.add('high');
+  });
+  document.getElementById('tick').textContent = 'UPDATED';
+
+  // update map line + marker color
+  mainLine.setStyle({color:'#d64545'});
+  mainLine.setPopupContent('<b>R-1042</b><br>Condition: 64 · Priority #1 (critical)');
+  marker.setStyle({color:'#d64545', fillColor:'#d64545', fillOpacity:.7});
+  mainHeat = samplePoints(mainCoords, 0.9, 6);
+  heatLayer.setLatLngs(roads.reduce((acc,r)=>acc.concat(samplePoints(r.coords,r.risk,6)),[]).concat(mainHeat));
+  await sleep(500);
+
+  // Stage 3: Forecast
+  setStage(3);
+  const fc = document.getElementById('forecast');
+  anime({targets:fc, opacity:[0,1], translateY:[8,0], duration:500, easing:'easeOutQuad'});
+  countTo(document.getElementById('f30'), 64, 47, 700);
+  countTo(document.getElementById('f60'), 64, 31, 900);
+  await sleep(900);
+
+  // Stage 4: Decision + alert
+  setStage(4);
+  stages[3].classList.add('done');
+  stages[3].querySelector('.connector')?.classList.add('on');
+  showToast();
+  await sleep(600);
+  setStage(-1);
+  stages[4].classList.add('done');
+
+  btn.textContent = 'Twin Updated — Priority Escalated';
+});
+
+function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+</script>
+</body>
+</html>

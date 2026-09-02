@@ -1,0 +1,54 @@
+{
+  "_comment": "Draft data contract between Traffic Risk Agent (Member 2) and Decision Engine (Member 3). Frontend (Member 4) consumes the 'decision_engine_output' shape below to drive the twin view. Needs Member 2/3 sign-off — this is a starting proposal, not final.",
+
+  "segment_update": {
+    "_comment": "Emitted by Vision + Sensor Fusion + Condition Agent whenever a new observation lands.",
+    "segment_id": "R-1042",
+    "observed_at": "2026-09-02T14:32:00Z",
+    "location": { "lat": 12.8230, "lng": 80.0450 },
+    "detections": [
+      { "type": "pothole", "count": 3, "severity": "high", "confidence": 0.91 },
+      { "type": "crack", "count": 4, "severity": "medium", "confidence": 0.86 },
+      { "type": "waterlogging", "count": 1, "severity": "high", "confidence": 0.79 }
+    ],
+    "condition_score": 64,
+    "condition_score_prev": 82,
+    "deterioration_forecast": { "d7": 58, "d30": 47, "d60": 31 }
+  },
+
+  "traffic_risk_context": {
+    "_comment": "Shared task — Member 2's Traffic Risk Agent produces this per segment.",
+    "segment_id": "R-1042",
+    "traffic_volume": "high",
+    "avg_speed_kmph": 42,
+    "pedestrian_density": "medium",
+    "nearby_poi": { "school_within_500m": true, "hospital_within_500m": false },
+    "weather": "clear",
+    "time_of_day": "day",
+    "accident_history_score": 0.3,
+    "risk_score": 91
+  },
+
+  "decision_engine_output": {
+    "_comment": "What Member 3's Decision Engine returns; frontend renders this directly.",
+    "segment_id": "R-1042",
+    "priority_rank": 1,
+    "priority_rank_prev": 7,
+    "risk_level": "high",
+    "recommended_action": "repair",
+    "recommended_window": { "start": "23:00", "end": "05:00" },
+    "alert": {
+      "sent": true,
+      "message": "R-1042 escalated to Priority #1 — repair window 23:00-05:00",
+      "channel": "authority_dashboard"
+    },
+    "what_if_simulation": {
+      "_comment": "Bonus feature, page 07 of deck — optional for MVP.",
+      "trigger": "road_closed_for_repair",
+      "reroutes": [
+        { "segment_id": "R-1033", "congestion_increase_pct": 34 },
+        { "segment_id": "R-1050", "congestion_increase_pct": 21 }
+      ]
+    }
+  }
+}
