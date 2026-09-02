@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime
@@ -13,6 +14,13 @@ from models import (
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="RoadTwin AI - Decision Engine")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -36,6 +44,55 @@ def create_road(name: str, start_lat: float = None, start_lng: float = None,
 @app.get("/roads")
 def list_roads(db: Session = Depends(get_db)):
     return db.query(Road).all()
+
+
+# ---------- SEED / RESET (frontend bootstrap for the demo) ----------
+
+SEED_ROADS = [
+    {"name": "R-1042", "start_lat": 12.8245, "start_lng": 80.0430, "end_lat": 12.8215, "end_lng": 80.0460},
+    {"name": "R-1015", "start_lat": 12.8280, "start_lng": 80.0400, "end_lat": 12.8265, "end_lng": 80.0430},
+    {"name": "R-1033", "start_lat": 12.8210, "start_lng": 80.0470, "end_lat": 12.8190, "end_lng": 80.0500},
+    {"name": "R-1050", "start_lat": 12.8195, "start_lng": 80.0390, "end_lat": 12.8175, "end_lng": 80.0420},
+]
+
+
+SEED_BASELINE_DEFECTS = {
+    "R-1042": [("crack", 0.6), ("faded_marking", 1.0)],
+}
+
+
+@app.post("/seed")
+def seed(db: Session = Depends(get_db)):
+    created = []
+    for r in SEED_ROADS:
+        existing = db.query(Road).filter(Road.name == r["name"]).first()
+        if existing:
+            continue
+        road = Road(**r)
+        db.add(road)
+        db.commit()
+        db.refresh(road)
+        for defect_type, severity in SEED_BASELINE_DEFECTS.get(r["name"], []):
+            db.add(Defect(road_id=road.id, defect_type=defect_type, severity=severity, source="baseline"))
+        db.commit()
+        compute_condition_score(road.id, db)
+        created.append(road.name)
+    return {"created": created, "roads": db.query(Road).all()}
+
+
+@app.delete("/roads/{road_id}/reset")
+def reset_road(road_id: int, db: Session = Depends(get_db)):
+    road = db.query(Road).filter(Road.id == road_id).first()
+    if not road:
+        raise HTTPException(status_code=404, detail="Road not found")
+    db.query(Defect).filter(Defect.road_id == road_id).delete()
+    db.query(ConditionScore).filter(ConditionScore.road_id == road_id).delete()
+    db.query(DeteriorationForecast).filter(DeteriorationForecast.road_id == road_id).delete()
+    db.query(TrafficRisk).filter(TrafficRisk.road_id == road_id).delete()
+    db.query(RepairPriority).filter(RepairPriority.road_id == road_id).delete()
+    db.commit()
+    compute_condition_score(road_id, db)  # back to baseline 100
+    return {"road_id": road_id, "status": "reset"}
 
 
 # ---------- DEFECT INGESTION (from Vision Agent / Member 1) ----------
@@ -63,6 +120,7 @@ def add_defect(defect: DefectIn, db: Session = Depends(get_db)):
 
     # auto-recompute condition score whenever a new defect comes in
     compute_condition_score(defect.road_id, db)
+    db.refresh(record)  # compute_condition_score's commit expires record's attrs
 
     return record
 
@@ -146,7 +204,6 @@ def get_forecast(road_id: int, db: Session = Depends(get_db)):
 # ---------- TRAFFIC RISK (data contract with Member 2) ----------
 
 class TrafficRiskIn(BaseModel):
-    road_id: int
     traffic_volume: Optional[float] = 0
     pedestrian_density: Optional[float] = 0
     near_school_hospital: Optional[int] = 0

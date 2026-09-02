@@ -127,38 +127,35 @@
       <span class="sep">/</span>
       <span class="sub">Observe · Predict · Prioritize · Repair · Repeat</span>
     </div>
-    <div class="status"><span class="sq" id="statusSq"></span><span id="statusTxt">SYNCED — SECTOR 04</span></div>
+    <div class="status"><span class="sq" id="statusSq"></span><span id="statusTxt">CONNECTING…</span></div>
   </header>
   <div id="map"></div>
   <div class="sidebar">
     <div class="card">
-      <h2>Focused Segment <span id="tick" class="badge low">LIVE</span></h2>
+      <h2>Focused Segment <span id="tick" class="badge low">LOADING</span></h2>
       <div class="road-id">Road R-1042</div>
       <div class="road-loc">GST Road, Kattankulathur — last scanned 2 min ago</div>
       <div class="stat-row">
         <div class="stat-box">
           <div class="label">Condition Score</div>
-          <div class="value score-val low" id="score">82</div>
+          <div class="value score-val low" id="score">—</div>
         </div>
         <div class="stat-box">
           <div class="label">Risk</div>
-          <div class="value" style="font-size:16px; margin-top:8px;"><span class="badge low" id="riskBadge">LOW</span></div>
+          <div class="value" style="font-size:16px; margin-top:8px;"><span class="badge low" id="riskBadge">—</span></div>
         </div>
         <div class="stat-box">
           <div class="label">Priority</div>
-          <div class="value priority-val" id="priority">#7</div>
+          <div class="value priority-val" id="priority">—</div>
         </div>
       </div>
-      <ul class="detections" id="detections">
-        <li>+3 NEW <b>POTHOLES</b></li>
-        <li>+4 NEW <b>CRACKS</b></li>
-        <li><b>WATERLOGGING</b> PRESENT</li>
-      </ul>
+      <ul class="detections" id="detections"></ul>
       <div class="forecast" id="forecast">
-        <div class="stat-box"><div class="label">+30 Day Forecast</div><div class="value" id="f30" style="font-size:20px;">47</div></div>
-        <div class="stat-box"><div class="label">+60 Day Forecast</div><div class="value" id="f60" style="font-size:20px;">31</div></div>
+        <div class="stat-box"><div class="label">+30 Day Forecast</div><div class="value" id="f30" style="font-size:20px;">—</div></div>
+        <div class="stat-box"><div class="label">+60 Day Forecast</div><div class="value" id="f60" style="font-size:20px;">—</div></div>
       </div>
-      <button class="btn" id="simBtn">Stream New Dashcam Footage →</button>
+      <button class="btn" id="simBtn" disabled>Connecting to backend…</button>
+      <div id="resetLink" style="text-align:center; margin-top:8px; font-size:10px; color:var(--muted); font-family:'IBM Plex Mono',monospace; cursor:pointer; display:none;">reset road (dev)</div>
     </div>
 
     <div class="card">
@@ -182,11 +179,23 @@
 </div>
 
 <script>
+// ---- Backend config ----
+const API_BASE = window.location.hostname ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://127.0.0.1:8000';
+const FOCUS_ROAD_NAME = 'R-1042';
+
+async function api(path, opts){
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: {'Content-Type':'application/json'},
+    ...opts
+  });
+  if(!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
 // ---- Map setup ----
 const map = L.map('map', {zoomControl:true, attributionControl:false}).setView([12.8232, 80.0445], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
 
-const legend = L.control({position:'bottomleft'});
 document.querySelector('#map').insertAdjacentHTML('beforeend', `
   <div class="legend">
     <div><span class="sw" style="background:#22c55e"></span>Low risk</div>
@@ -194,22 +203,11 @@ document.querySelector('#map').insertAdjacentHTML('beforeend', `
     <div><span class="sw" style="background:#ef4444"></span>High risk</div>
   </div>`);
 
-const roads = [
-  {id:'R-1015', coords:[[12.8280,80.0400],[12.8265,80.0430]], color:'#3fb950', risk:0.25},
-  {id:'R-1033', coords:[[12.8210,80.0470],[12.8190,80.0500]], color:'#c9942f', risk:0.55},
-  {id:'R-1050', coords:[[12.8195,80.0390],[12.8175,80.0420]], color:'#3fb950', risk:0.22},
-];
-roads.forEach(r=>{
-  L.polyline(r.coords, {color:r.color, weight:5, opacity:.85}).bindPopup(`<b>${r.id}</b><br>Stable`).addTo(map);
-});
-
-const mainCoords = [[12.8245,80.0430],[12.8230,80.0450],[12.8215,80.0460]];
-const mainLine = L.polyline(mainCoords, {color:'#3fb950', weight:7, opacity:.95}).addTo(map);
-mainLine.bindPopup('<b>R-1042</b><br>Condition: 82 · Priority #7');
-
-const marker = L.circleMarker([12.8230,80.0450], {radius:9, color:'#3fb950', weight:2, fillColor:'#3fb950', fillOpacity:.5}).addTo(map);
-
-// ---- Risk heatmap: sample points along every segment, weighted by risk ----
+function scoreColor(score){
+  if(score >= 80) return '#3fb950';
+  if(score >= 60) return '#c9942f';
+  return '#d64545';
+}
 function lerp(a,b,t){ return a+(b-a)*t; }
 function samplePoints(coords, weight, steps){
   const pts=[];
@@ -221,20 +219,128 @@ function samplePoints(coords, weight, steps){
   }
   return pts;
 }
-let heatPoints = [];
-roads.forEach(r=> heatPoints = heatPoints.concat(samplePoints(r.coords, r.risk, 6)));
-let mainHeat = samplePoints(mainCoords, 0.2, 6);
-heatPoints = heatPoints.concat(mainHeat);
 
-const heatLayer = L.heatLayer(heatPoints, {
+const heatLayer = L.heatLayer([], {
   radius:32, blur:28, maxZoom:17, max:1.0,
   gradient:{0.15:'#3fb950', 0.45:'#c9942f', 0.75:'#d64545'}
 }).addTo(map);
 
-// ---- Demo state machine ----
+const roadLines = {};   // name -> L.polyline
+const roadMarker = {};  // name -> L.circleMarker (focus road only)
+let focusRoad = null;   // {id, name, coords, score, ...}
+let allRoads = [];
+
+function rebuildHeat(){
+  let pts = [];
+  allRoads.forEach(r=>{
+    const w = Math.max(0.12, (100 - (r.score ?? 100)) / 100);
+    pts = pts.concat(samplePoints(r.coords, w, 6));
+  });
+  heatLayer.setLatLngs(pts);
+}
+
+function renderRoad(r){
+  const color = scoreColor(r.score ?? 100);
+  if(roadLines[r.name]){
+    roadLines[r.name].setStyle({color});
+    roadLines[r.name].setPopupContent(`<b>${r.name}</b><br>Condition: ${r.score}`);
+  } else {
+    roadLines[r.name] = L.polyline(r.coords, {color, weight: r.name===FOCUS_ROAD_NAME?7:5, opacity:.9})
+      .bindPopup(`<b>${r.name}</b><br>Condition: ${r.score}`).addTo(map);
+  }
+  if(r.name === FOCUS_ROAD_NAME){
+    const mid = r.coords[Math.floor(r.coords.length/2)];
+    if(!roadMarker[r.name]){
+      roadMarker[r.name] = L.circleMarker(mid, {radius:9, color, weight:2, fillColor:color, fillOpacity:.5}).addTo(map);
+    } else {
+      roadMarker[r.name].setStyle({color, fillColor:color});
+    }
+  }
+}
+
+// ---- Bootstrap: load roads from the real backend, seeding if empty ----
+const statusSq = document.getElementById('statusSq');
+const statusTxt = document.getElementById('statusTxt');
 const btn = document.getElementById('simBtn');
+const resetLink = document.getElementById('resetLink');
 const stages = document.querySelectorAll('.stage');
 let ran = false;
+
+function setOffline(err){
+  statusTxt.textContent = 'BACKEND OFFLINE';
+  statusSq.style.background = '#d64545';
+  btn.textContent = 'Backend unreachable — start it first';
+  document.getElementById('tick').textContent = 'OFFLINE';
+  document.getElementById('tick').classList.remove('low'); document.getElementById('tick').classList.add('high');
+  console.error('RoadTwin backend error:', err);
+  const note = document.createElement('div');
+  note.style.cssText = 'font-size:11px; color:var(--muted); margin-top:8px; font-family:"IBM Plex Mono",monospace; line-height:1.6;';
+  note.innerHTML = `Could not reach <b>${API_BASE}</b>.<br>Run: <span style="color:var(--accent)">uvicorn main:app --reload</span> in the repo root, then reload this page.`;
+  document.querySelector('.sidebar .card').appendChild(note);
+}
+
+async function bootstrap(){
+  try{
+    let roads = await api('/roads');
+    if(roads.length === 0){
+      await api('/seed', {method:'POST'});
+      roads = await api('/roads');
+    }
+    allRoads = await Promise.all(roads.map(async r=>{
+      const summary = await api(`/roads/${r.id}/summary`);
+      return {
+        id: r.id, name: r.name,
+        coords: [[r.start_lat, r.start_lng], [r.end_lat, r.end_lng]],
+        score: summary.condition_score ?? 100,
+        forecast: summary.forecast,
+        priority_rank: summary.priority_rank
+      };
+    }));
+    allRoads.forEach(renderRoad);
+    rebuildHeat();
+
+    focusRoad = allRoads.find(r => r.name === FOCUS_ROAD_NAME);
+    if(!focusRoad) throw new Error(`${FOCUS_ROAD_NAME} not found after seeding`);
+
+    map.setView(focusRoad.coords[0], 15);
+    paintFocusCard(focusRoad);
+
+    statusTxt.textContent = 'SYNCED — LIVE BACKEND';
+    statusSq.style.background = '#3fb950';
+    document.getElementById('tick').textContent = 'LIVE';
+    btn.disabled = false;
+    btn.textContent = 'Stream New Dashcam Footage →';
+    resetLink.style.display = 'block';
+  }catch(err){
+    setOffline(err);
+  }
+}
+
+function paintFocusCard(r){
+  const scoreEl = document.getElementById('score');
+  const riskBadge = document.getElementById('riskBadge');
+  const priority = document.getElementById('priority');
+  scoreEl.textContent = Math.round(r.score);
+  const cls = r.score >= 80 ? 'low' : 'high';
+  scoreEl.classList.remove('low','high'); scoreEl.classList.add(cls);
+  riskBadge.textContent = r.score >= 80 ? 'LOW' : 'HIGH';
+  riskBadge.classList.remove('low','high'); riskBadge.classList.add(cls);
+  priority.textContent = r.priority_rank ? `#${r.priority_rank}` : '—';
+  priority.classList.remove('high');
+  if(r.forecast){
+    document.getElementById('f30').textContent = Math.round(r.forecast['30d']);
+    document.getElementById('f60').textContent = Math.round(r.forecast['60d']);
+  }
+}
+
+resetLink.addEventListener('click', async ()=>{
+  if(!focusRoad) return;
+  resetLink.textContent = 'resetting…';
+  await api(`/roads/${focusRoad.id}/reset`, {method:'DELETE'});
+  location.reload();
+});
+
+bootstrap();
 
 function setStage(i, cls){
   stages.forEach(s=>s.classList.remove('active'));
@@ -261,10 +367,11 @@ function flipValue(el, newText, onMid){
     }});
 }
 
-function showToast(){
+function showToast(rank, recommendation){
   const t = document.createElement('div');
   t.className='toast';
-  t.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="#d64545" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="#d64545" stroke-width="1.6"/><circle cx="12" cy="17" r="1" fill="#d64545"/></svg><div class="msg"><strong>Authorities alerted automatically</strong><span>R-1042 escalated to Priority #1 — repair window 23:00–05:00</span></div>`;
+  const detail = recommendation || `${FOCUS_ROAD_NAME} escalated to Priority #${rank}`;
+  t.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="#d64545" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="#d64545" stroke-width="1.6"/><circle cx="12" cy="17" r="1" fill="#d64545"/></svg><div class="msg"><strong>Authorities alerted automatically</strong><span>${detail}</span></div>`;
   document.body.appendChild(t);
   anime({targets:t, opacity:[0,1], rotateX:[-90,0], duration:550, easing:'easeOutBack'});
   setTimeout(()=>{
@@ -289,73 +396,112 @@ setInterval(()=>{
   anime({targets:'#statusSq', opacity:[1,.25,1], duration:1400, easing:'easeInOutSine'});
 }, 1400);
 
+const NEW_DETECTIONS = [
+  {type:'pothole', severity:1, label:'+3 NEW <b>POTHOLES</b>', count:3},
+  {type:'crack', severity:1, label:'+4 NEW <b>CRACKS</b>', count:4},
+  {type:'waterlogging', severity:1, label:'<b>WATERLOGGING</b> PRESENT', count:1},
+];
+
 btn.addEventListener('click', async ()=>{
-  if(ran) return;
+  if(ran || !focusRoad) return;
   ran = true;
   btn.disabled = true;
   btn.textContent = 'Processing footage…';
+  const detections = document.getElementById('detections');
+  detections.innerHTML = '';
 
-  const lis = document.querySelectorAll('#detections li');
+  try{
+    // Stage 0: Vision — post real defect rows to the backend
+    setStage(0);
+    await sleep(400);
+    for(const d of NEW_DETECTIONS){
+      for(let i=0;i<d.count;i++){
+        await api('/defects', {method:'POST', body: JSON.stringify({
+          road_id: focusRoad.id, defect_type: d.type, severity: d.severity, source: 'dashcam_live_demo'
+        })});
+      }
+      const li = document.createElement('li');
+      li.innerHTML = d.label;
+      detections.appendChild(li);
+      anime({targets:li, opacity:[0,1], translateX:[-10,0], duration:400, easing:'easeOutQuad'});
+      await sleep(200);
+    }
 
-  // Stage 0: Vision
-  setStage(0);
-  await sleep(600);
-  for(const li of lis){
-    anime({targets:li, opacity:[0,1], translateX:[-10,0], duration:400, easing:'easeOutQuad'});
-    await sleep(250);
+    // Stage 1: Sensor fusion (visual beat — no separate backend call yet)
+    setStage(1);
+    if(roadMarker[focusRoad.name]){
+      anime({targets:{r:9}, r:16, duration:500, update:function(a){ roadMarker[focusRoad.name].setRadius(a.animations[0].currentValue); }});
+    }
+    await sleep(600);
+
+    // Stage 2: Condition model — real recomputed score from the backend
+    setStage(2);
+    const conditionRes = await api(`/roads/${focusRoad.id}/condition-score`);
+    const newScore = conditionRes.score;
+    const scoreEl = document.getElementById('score');
+    const cls = newScore >= 80 ? 'low' : 'high';
+    flipValue(scoreEl, null, ()=>{
+      countTo(scoreEl, focusRoad.score, newScore, 700);
+      scoreEl.classList.remove('low','high'); scoreEl.classList.add(cls);
+    });
+
+    const riskBadge = document.getElementById('riskBadge');
+    await sleep(750);
+    const riskLabel = newScore >= 80 ? 'LOW' : 'HIGH';
+    flipValue(riskBadge, riskLabel, ()=>{
+      riskBadge.textContent = riskLabel; riskBadge.classList.remove('low','high'); riskBadge.classList.add(cls);
+    });
+
+    // real traffic-risk + repair-priority ranking across the whole network
+    await api(`/roads/${focusRoad.id}/traffic-risk`, {method:'POST', body: JSON.stringify({
+      traffic_volume: 80, pedestrian_density: 40, near_school_hospital: 1,
+      weather_factor: 10, time_of_day_factor: 10
+    })});
+    const priorities = await api('/repair-priorities');
+    const mine = priorities.find(p => p.road_id === focusRoad.id);
+    const newRank = mine ? mine.priority_rank : '—';
+
+    const priorityEl = document.getElementById('priority');
+    flipValue(priorityEl, `#${newRank}`, ()=>{
+      priorityEl.textContent = `#${newRank}`;
+      if(cls === 'high') priorityEl.classList.add('high');
+    });
+    document.getElementById('tick').textContent = 'UPDATED';
+
+    focusRoad.score = newScore;
+    focusRoad.priority_rank = newRank;
+    renderRoad(focusRoad);
+    rebuildHeat();
+    await sleep(500);
+
+    // Stage 3: Forecast — real deterioration model output
+    setStage(3);
+    const forecastRes = await api(`/roads/${focusRoad.id}/forecast`);
+    const fc = document.getElementById('forecast');
+    anime({targets:fc, opacity:[0,1], translateY:[8,0], duration:500, easing:'easeOutQuad'});
+    countTo(document.getElementById('f30'), newScore, forecastRes.forecast_30d, 700);
+    countTo(document.getElementById('f60'), newScore, forecastRes.forecast_60d, 900);
+    await sleep(900);
+
+    // Stage 4: Decision engine — real what-if simulation output drives the alert
+    setStage(4);
+    stages[3].classList.add('done');
+    stages[3].querySelector('.connector')?.classList.add('on');
+    const sim = cls === 'high'
+      ? await api('/simulate', {method:'POST', body: JSON.stringify({road_id: focusRoad.id, scenario:'road_closure'})})
+      : null;
+    showToast(newRank, sim ? sim.recommendation : null);
+    await sleep(600);
+    setStage(-1);
+    stages[4].classList.add('done');
+
+    btn.textContent = `Twin Updated — Priority #${newRank}`;
+  }catch(err){
+    btn.textContent = 'Error — check backend logs';
+    console.error(err);
+    ran = false;
+    btn.disabled = false;
   }
-  await sleep(400);
-
-  // Stage 1: Sensor fusion
-  setStage(1);
-  marker.setStyle({color:'#c9942f', fillColor:'#c9942f'});
-  anime({targets:{r:9}, r:16, duration:500, update:function(a){ marker.setRadius(a.animations[0].currentValue); }});
-  await sleep(700);
-
-  // Stage 2: Condition model — score flips, risk flips
-  setStage(2);
-  const scoreEl = document.getElementById('score');
-  flipValue(scoreEl, null, ()=>{
-    countTo(scoreEl, 82, 64, 700);
-    scoreEl.classList.remove('low'); scoreEl.classList.add('high');
-  });
-  const riskBadge = document.getElementById('riskBadge');
-  await sleep(950);
-  flipValue(riskBadge, 'HIGH', ()=>{
-    riskBadge.textContent = 'HIGH'; riskBadge.classList.remove('low'); riskBadge.classList.add('high');
-  });
-  const priority = document.getElementById('priority');
-  flipValue(priority, '#1', ()=>{
-    priority.textContent = '#1'; priority.classList.add('high');
-  });
-  document.getElementById('tick').textContent = 'UPDATED';
-
-  // update map line + marker color
-  mainLine.setStyle({color:'#d64545'});
-  mainLine.setPopupContent('<b>R-1042</b><br>Condition: 64 · Priority #1 (critical)');
-  marker.setStyle({color:'#d64545', fillColor:'#d64545', fillOpacity:.7});
-  mainHeat = samplePoints(mainCoords, 0.9, 6);
-  heatLayer.setLatLngs(roads.reduce((acc,r)=>acc.concat(samplePoints(r.coords,r.risk,6)),[]).concat(mainHeat));
-  await sleep(500);
-
-  // Stage 3: Forecast
-  setStage(3);
-  const fc = document.getElementById('forecast');
-  anime({targets:fc, opacity:[0,1], translateY:[8,0], duration:500, easing:'easeOutQuad'});
-  countTo(document.getElementById('f30'), 64, 47, 700);
-  countTo(document.getElementById('f60'), 64, 31, 900);
-  await sleep(900);
-
-  // Stage 4: Decision + alert
-  setStage(4);
-  stages[3].classList.add('done');
-  stages[3].querySelector('.connector')?.classList.add('on');
-  showToast();
-  await sleep(600);
-  setStage(-1);
-  stages[4].classList.add('done');
-
-  btn.textContent = 'Twin Updated — Priority Escalated';
 });
 
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
