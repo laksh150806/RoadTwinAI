@@ -260,6 +260,38 @@
   </div>
 </section>
 
+<section class="page-section" id="prioritySection">
+  <h3>// Live Decision Engine</h3>
+  <h2 class="big">Recompute repair priority across the whole network.</h2>
+  <p class="lead">Calls the real <span class="mono">/repair-priorities</span> endpoint — condition score × traffic risk, ranked live, right now.</p>
+  <button class="btn" id="rankBtn" style="max-width:260px; margin-bottom:20px;">Run Priority Ranking →</button>
+  <div id="rankTable"></div>
+</section>
+
+<section class="page-section" id="reportSection">
+  <h3>// Report A Defect</h3>
+  <h2 class="big">Feed the twin yourself.</h2>
+  <p class="lead">Posts a real defect to <span class="mono">/defects</span> — the condition score, forecast, and priority rank for that road update live from your input.</p>
+  <div class="sim-panel" style="max-width:560px;">
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <select id="repRoad" class="btn" style="background:var(--bg); text-align:left;"></select>
+      <select id="repType" class="btn" style="background:var(--bg); text-align:left;">
+        <option value="pothole">Pothole</option>
+        <option value="crack">Crack</option>
+        <option value="waterlogging">Waterlogging</option>
+        <option value="damaged_barrier">Damaged barrier</option>
+        <option value="faded_marking">Faded marking</option>
+        <option value="broken_streetlight">Broken streetlight</option>
+      </select>
+      <label style="font-size:11px; color:var(--muted);">Severity: <span id="repSevVal">0.5</span>
+        <input type="range" id="repSev" min="0.1" max="1" step="0.05" value="0.5" style="width:100%; margin-top:6px;">
+      </label>
+      <button class="btn" id="repSubmit">Submit Defect →</button>
+      <div id="repResult" style="font-size:11.5px; color:var(--muted);"></div>
+    </div>
+  </div>
+</section>
+
 <footer class="page-section">RoadTwin AI — Observe · Predict · Prioritize · Repair · Repeat.</footer>
 
 <script>
@@ -605,9 +637,65 @@ function populateNetworkGrid(){
       <div class="rc-row"><span>Priority</span><b>#${r.priority_rank ?? '—'}</b></div>
       <div class="rc-row"><span>Risk</span><b>${cls === 'high' ? 'HIGH' : 'LOW'}</b></div>
     `;
+    card.style.cursor = 'pointer';
+    card.title = 'Click to focus this road on the live twin above';
+    card.addEventListener('click', ()=>{
+      focusRoad = r;
+      map.setView(r.coords[0], 15);
+      paintFocusCard(r);
+      document.getElementById('networkSection').scrollIntoView({behavior:'smooth', block:'start'});
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
     grid.appendChild(card);
   });
+
+  const repRoad = document.getElementById('repRoad');
+  repRoad.innerHTML = allRoads.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
 }
+
+document.getElementById('repSev').addEventListener('input', e=>{
+  document.getElementById('repSevVal').textContent = e.target.value;
+});
+
+document.getElementById('repSubmit').addEventListener('click', async ()=>{
+  const btn = document.getElementById('repSubmit');
+  const out = document.getElementById('repResult');
+  const roadId = parseInt(document.getElementById('repRoad').value);
+  const defect_type = document.getElementById('repType').value;
+  const severity = parseFloat(document.getElementById('repSev').value);
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try{
+    await api('/defects', {method:'POST', body: JSON.stringify({road_id: roadId, defect_type, severity, confidence: 0.9, source: 'manual_report'})});
+    const summary = await api(`/roads/${roadId}/summary`);
+    const road = allRoads.find(r=>r.id===roadId);
+    if(road){ road.score = summary.condition_score; road.priority_rank = summary.priority_rank; renderRoad(road); rebuildHeat(); populateNetworkGrid(); }
+    out.textContent = `Applied — ${road ? road.name : 'road'} condition score now ${summary.condition_score}.`;
+    out.style.color = 'var(--green)';
+  }catch(err){
+    out.textContent = 'Failed: ' + err.message;
+    out.style.color = 'var(--red)';
+  }
+  btn.disabled = false; btn.textContent = 'Submit Defect →';
+});
+
+document.getElementById('rankBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('rankBtn');
+  const table = document.getElementById('rankTable');
+  btn.disabled = true; btn.textContent = 'Computing…';
+  try{
+    const ranked = await api('/repair-priorities');
+    table.innerHTML = `<div class="sim-panel"><table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <tr style="color:var(--muted); text-align:left;"><th style="padding:6px 0;">Rank</th><th>Road</th><th>Condition</th><th>Risk</th><th>Priority Score</th></tr>
+      ${ranked.map(r=>`<tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px 0; color:${r.priority_rank===1?'var(--red)':'var(--text)'};">#${r.priority_rank}</td>
+        <td>${r.road_name}</td><td>${r.condition_score}</td><td>${r.risk_score}</td><td>${r.priority_score}</td>
+      </tr>`).join('')}
+    </table></div>`;
+  }catch(err){
+    table.innerHTML = `<div style="color:var(--red); font-size:12px;">Failed: ${err.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Run Priority Ranking →';
+});
 
 // scroll-reveal for the content sections below the hero
 const revealObserver = new IntersectionObserver((entries)=>{
