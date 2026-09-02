@@ -1,9 +1,15 @@
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+roadtwin.db
+*.sqlite3
 .venv/
 .venv_check/
 .venv_vision/
-roadtwin.db
+env/
+venv/
 *.pt
 dummy_dashcam.mp4
 demo_dashcam_output.mp4
