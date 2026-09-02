@@ -180,7 +180,7 @@
 
 <script>
 // ---- Backend config ----
-const API_BASE = window.location.hostname ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://127.0.0.1:8000';
+const API_BASE = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : 'http://127.0.0.1:8001';
 const FOCUS_ROAD_NAME = 'R-1042';
 
 async function api(path, opts){

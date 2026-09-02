@@ -43,6 +43,7 @@ Endpoints
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime
@@ -88,7 +89,16 @@ def root():
         "status": "RoadTwin AI backend running",
         "ml_model_loaded": _predictor.is_ml_ready(),
         "version": "2.0.0",
+        "dashboard_url": "/dashboard",
     }
+
+
+@app.get("/dashboard", tags=["Dashboard UI"])
+@app.get("/app", tags=["Dashboard UI"])
+def get_dashboard():
+    import os
+    html_path = os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+    return FileResponse(html_path)
 
 
 @app.post("/roads", tags=["Roads"])
