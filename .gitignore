@@ -14,3 +14,5 @@ venv/
 dummy_dashcam.mp4
 demo_dashcam_output.mp4
 structured_events.jsonl
+runs/
+*.cache

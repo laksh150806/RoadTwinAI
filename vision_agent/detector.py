@@ -18,12 +18,27 @@ DEFECT_CLASSES = [
 ]
 
 class VisionAgent:
-    def __init__(self, model_path="yolov8n.pt", mock_mode=True):
+    def __init__(self, model_path=None, mock_mode=None):
         """
         Initializes the Vision Agent.
-        If mock_mode is True, we use a generic YOLO model (like yolov8n.pt) 
-        and map random detections to our target classes for demo purposes.
+        If trained weights exist in runs/roadtwin_yolo/weights/best.pt, they are loaded.
+        Otherwise, falls back to yolov8n.pt (Mock Mode).
         """
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        trained_path = os.path.join(project_root, "runs", "roadtwin_yolo", "weights", "best.pt")
+
+        if model_path is None:
+            if os.path.exists(trained_path):
+                model_path = trained_path
+                if mock_mode is None:
+                    mock_mode = False
+            else:
+                model_path = "yolov8n.pt"
+                if mock_mode is None:
+                    mock_mode = True
+        elif mock_mode is None:
+            mock_mode = False
+
         self.mock_mode = mock_mode
         print(f"Initializing YOLO model: {model_path} (Mock Mode: {mock_mode})")
         self.model = YOLO(model_path)
