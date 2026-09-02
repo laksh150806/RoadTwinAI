@@ -41,7 +41,7 @@ Endpoints
     GET  /ml/status                       shows whether ML model is loaded
 """
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -77,6 +77,50 @@ app.add_middleware(
 # Singletons — loaded once at startup
 _fusion_agent = SensorFusionAgent()
 _predictor = DeteriorationPredictor()
+
+
+# ---------- Live twin push (WebSocket) ----------
+# Winning-demo pattern: every dashboard tab gets pushed the update the instant
+# a defect lands, instead of polling or requiring a manual refresh.
+class ConnectionManager:
+    def __init__(self):
+        self.active: List[WebSocket] = []
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active.append(ws)
+
+    def disconnect(self, ws: WebSocket):
+        if ws in self.active:
+            self.active.remove(ws)
+
+    async def broadcast(self, payload: dict):
+        dead = []
+        for ws in self.active:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws")
+async def twin_updates(ws: WebSocket):
+    await manager.connect(ws)
+    try:
+        while True:
+            await ws.receive_text()  # keepalive ping from client; payload unused
+    except WebSocketDisconnect:
+        manager.disconnect(ws)
+
+
+@app.get("/health", tags=["Health"])
+def health():
+    return {"status": "ok", "connected_clients": len(manager.active)}
 
 
 # ===========================================================================
@@ -185,7 +229,7 @@ class DefectIn(BaseModel):
 
 
 @app.post("/defects", tags=["Defects"])
-def add_defect(defect: DefectIn, db: Session = Depends(get_db)):
+async def add_defect(defect: DefectIn, db: Session = Depends(get_db)):
     road = db.query(Road).filter(Road.id == defect.road_id).first()
     if not road:
         raise HTTPException(status_code=404, detail="Road not found")
@@ -206,8 +250,16 @@ def add_defect(defect: DefectIn, db: Session = Depends(get_db)):
     db.refresh(record)
 
     # Auto-recompute condition score on every new defect
-    compute_condition_score(defect.road_id, db)
+    new_score, breakdown = compute_condition_score(defect.road_id, db)
     db.refresh(record)
+
+    await manager.broadcast({
+        "event": "defect_added",
+        "road_id": defect.road_id,
+        "road_name": road.name,
+        "defect_type": defect.defect_type,
+        "condition_score": new_score,
+    })
     return record
 
 

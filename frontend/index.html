@@ -23,6 +23,10 @@
     font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
     height:auto; min-height:100vh; overflow-x:hidden;
   }
+  html{scroll-behavior:smooth;}
+  .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.5px; padding:14px 12px; white-space:nowrap; border-bottom:2px solid transparent;}
+  .nav-link:hover{color:var(--text);}
+  .nav-link.active{color:var(--accent); border-bottom-color:var(--accent);}
   .app{ /* hero stays exactly one viewport tall, rest of the page scrolls below it */ }
   .page-section{max-width:1100px; margin:0 auto; padding:90px 24px;}
   .page-section h3{font-size:11px; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin-bottom:10px; font-family:'IBM Plex Mono',monospace;}
@@ -202,6 +206,16 @@
     </div>
   </div>
 </div>
+
+<nav id="sectionNav" style="position:sticky; top:0; z-index:600; display:flex; gap:2px; background:var(--panel); border-bottom:1px solid var(--border); padding:0 24px; overflow-x:auto;">
+  <a href="#networkSection" class="nav-link">Network</a>
+  <a href="#problemSection" class="nav-link">Problem</a>
+  <a href="#pipelineSection" class="nav-link">Pipeline</a>
+  <a href="#simSection" class="nav-link">Simulation</a>
+  <a href="#prioritySection" class="nav-link">Priorities</a>
+  <a href="#reportSection" class="nav-link">Report Defect</a>
+  <a href="#teamSection" class="nav-link">Team</a>
+</nav>
 
 <section class="page-section" id="networkSection">
   <h3>// Network Overview</h3>
@@ -702,6 +716,20 @@ const revealObserver = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('reveal-in'); });
 }, {threshold:0.15});
 document.querySelectorAll('.road-card, .step-card, .team-card').forEach(el=>revealObserver.observe(el));
+
+// highlight the active nav link as sections scroll past
+const navLinks = document.querySelectorAll('.nav-link');
+const navObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      navLinks.forEach(a=>a.classList.remove('active'));
+      const link = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+      if(link) link.classList.add('active');
+    }
+  });
+}, {rootMargin:'-40% 0px -55% 0px'});
+['networkSection','problemSection','pipelineSection','simSection','prioritySection','reportSection','teamSection']
+  .forEach(id=>{ const el = document.getElementById(id); if(el) navObserver.observe(el); });
 </script>
 </body>
 </html>
