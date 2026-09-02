@@ -8,6 +8,7 @@ roadtwin.db
 .venv/
 .venv_check/
 .venv_vision/
+.venv_test/
 env/
 venv/
 *.pt
