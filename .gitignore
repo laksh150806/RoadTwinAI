@@ -2,4 +2,9 @@ __pycache__/
 *.pyc
 .venv/
 .venv_check/
+.venv_vision/
 roadtwin.db
+*.pt
+dummy_dashcam.mp4
+demo_dashcam_output.mp4
+structured_events.jsonl

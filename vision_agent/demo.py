@@ -2,7 +2,7 @@ import cv2
 import json
 import numpy as np
 import os
-from detector import VisionAgent
+from .detector import VisionAgent
 
 def create_dummy_video(filename="dummy_dashcam.mp4", duration_sec=3, fps=10):
     """Creates a simple dummy video simulating a dashcam feed."""
